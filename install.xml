@@ -1,0 +1,608 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+=== This extension will allow admin to set different price for a product
+=== based on different quantity range
+ -->
+<modification>
+  <name>Add Images With Reviews</name>
+  <code>add_images_with_reviews</code>
+  <version>1.0.0</version>
+  <author>Hassan Raza</author>
+  <link>https://hassanraza.net/</link>
+
+  <!-- ============================================== -->
+  <!-- ========== Admin panel menu setting ========== -->
+
+  <!-- ============================================= -->
+  
+  <!-- LANGUAGE FILES -->
+  <file path="admin/language/*/catalog/product.php">
+    <operation>
+      <search><![CDATA[<?php]]></search>
+      <add position="after">
+        <![CDATA[
+        
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <!-- LANGUAGE FILES END -->
+
+  <!-- ============================================= -->
+
+  <!-- CONTROLLER FILES -->
+
+  <file path="admin/controller/catalog/review.php">
+    <operation>
+      <search><![CDATA[protected function getForm() {]]></search>
+      <add position="after">
+        <![CDATA[
+          $this->document->addStyle('view/template/extension/stylesheet/image-uploader.min.css');
+          $this->document->addScript('view/template/extension/javascript/image-uploader.min.js');
+
+          $this->load->model('setting/setting');
+          $data['no_of_images'] = $this->model_setting_setting->getSettingValue('images_with_review_no_of_images');
+          if($data['no_of_images'] == ''){
+          $data['no_of_images'] = 3;
+          }
+          $data['image_size'] = $this->model_setting_setting->getSettingValue('images_with_review_image_size');
+          if($data['image_size'] == ''){
+          $data['image_size'] = 1048576;
+          }
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <file path="admin/controller/catalog/review.php">
+    <operation>
+      <search><![CDATA[$this->model_catalog_review->addReview($this->request->post);]]></search>
+      <add position="replace">
+        <![CDATA[
+          $this->model_catalog_review->addReview($this->request->post, empty($this->request->files['images']['name']) ? null : $this->request->files);
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <file path="admin/controller/catalog/review.php">
+    <operation>
+      <search><![CDATA[$this->model_catalog_review->editReview($this->request->get['review_id'], $this->request->post);]]></search>
+      <add position="replace">
+        <![CDATA[
+          $this->model_catalog_review->editReview($this->request->get['review_id'], $this->request->post, empty($this->request->files['images']['name']) ? null : $this->request->files);
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <file path="admin/controller/catalog/review.php">
+    <operation>
+      <search><![CDATA[protected function getList() {]]></search>
+      <add position="before">
+        <![CDATA[
+          //  delete review image
+          public function deleteReviewImage(){
+              $this->load->model('catalog/review');
+              $this->model_catalog_review->deleteReviewImage($this->request->post);
+          }
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <file path="admin/controller/catalog/review.php">
+    <operation>
+      <search><![CDATA[if (isset($this->request->post['status'])) {]]></search>
+      <add position="before">
+        <![CDATA[
+            //    review images
+            if (count($this->model_catalog_review->getReviewImages($this->request->get['review_id'])) > 0){
+                $review_images = $this->model_catalog_review->getReviewImages($this->request->get['review_id']);
+                $data['images'] = [];
+                foreach ($review_images as $image){
+                    $data['images'][] = [
+                        'image' => $this->request->server['HTTP'] ? HTTP_CATALOG . 'image/' . $image['image'] : HTTPS_CATALOG . 'image/' . $image['image'],
+                        'review_image_id' => $image['review_image_id']
+                    ];
+                }
+            }
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <!-- CONTROLLER FILES END -->
+
+  <!-- ============================================= -->
+
+  <!-- MODEL FILES -->
+
+  <file path="admin/model/catalog/review.php">
+    <operation>
+      <search><![CDATA[public function addReview($data) {]]></search>
+      <add position="replace">
+        <![CDATA[
+          public function addReview($data, $images = null) {
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <file path="admin/model/catalog/review.php">
+    <operation>
+      <search><![CDATA[public function editReview($review_id, $data) {]]></search>
+      <add position="replace">
+        <![CDATA[
+          public function editReview($review_id, $data, $images = null) {
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <file path="admin/model/catalog/review.php">
+    <operation>
+      <search index="0, 1"><![CDATA[$this->cache->delete('product');]]></search>
+      <add position="before">
+        <![CDATA[
+          // Add images if any
+          $this->addImages($images, $review_id);
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <file path="admin/model/catalog/review.php">
+    <operation>
+      <search><![CDATA[public function getTotalReviewsAwaitingApproval() {]]></search>
+      <add position="before">
+        <![CDATA[
+           public function getReviewImages($review_id){
+              $query = $this->db->query("SELECT * FROM " . DB_PREFIX . "review_images WHERE review_id = '" . $review_id . "'");
+                return $query->rows;
+            }
+            public function deleteReviewImage($data){
+                $query = $this->db->query("DELETE FROM " . DB_PREFIX . "review_images WHERE review_image_id = '" . $data['review_image_id'] . "'");
+                $server = $this->request->server['HTTP'] ? HTTP_CATALOG : HTTPS_CATALOG;
+                $image_path = str_replace($server, "/", $data['image_path'] );
+                if (!unlink(".." . $image_path)){
+                    var_dump('error');
+                    die();
+                }
+            }
+
+            private function addImages($images, $review_id){
+                if ($images != null && $review_id){
+                  $allowed_extension = ["jpeg","jpg","png"];
+
+                  foreach ($this->request->files['images']['tmp_name'] as $key=>$temp_name){
+                      $image_name = $this->request->files["images"]["name"][$key];
+                      $image_tmp = $this->request->files["images"]["tmp_name"][$key];
+
+                      $ext = pathinfo($image_name,PATHINFO_EXTENSION);
+
+                      // validate extension
+                      if(in_array($ext, $allowed_extension) && ((utf8_strlen($image_name) > 3) || (utf8_strlen($image_name) < 64))) {
+                          $upload_path = 'catalog/review/' . $image_name;
+                          move_uploaded_file($image_tmp, DIR_IMAGE . $upload_path);
+
+                          $this->db->query("INSERT INTO " . DB_PREFIX . "review_images SET review_id = '" . (int)$review_id . "', image = '" . $upload_path . "'");
+                      }
+
+                  }
+                }
+            }
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <!-- MODEL FILES END -->
+
+  <!-- ============================================= -->
+
+  <!-- VIEW FILES -->
+
+  <file path="admin/view/template/catalog/review_form.twig">
+    <operation>
+      <search><![CDATA[<label class="col-sm-2 control-label" for="input-date-added">{{ entry_date_added }}</label>]]></search>
+      <add position="before" offset="1">
+        <![CDATA[
+          <div class="form-group">
+            <label class="col-sm-2 control-label">Images</label>
+            <div class="col-sm-10 review-images">
+            </div>
+          </div>
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <file path="admin/view/template/catalog/review_form.twig">
+    <operation>
+      <search index="0"><![CDATA[</script>]]></search>
+      <add position="after">
+        <![CDATA[
+          <script>
+          let preloadedImages = [
+            {% if images%}
+            {% for image in images %}
+            {id: {{image.review_image_id}}, src: '{{ image.image }}'},
+            {% endfor %}
+            {% endif %}
+          ];
+          $('.review-images').imageUploader({
+            extensions: ['.jpg', '.jpeg', '.png'],
+            maxFiles: '{{ no_of_images }}',
+            maxSize: '{{ image_size }}',
+            preloaded: preloadedImages
+          });
+          {% if images %}
+          $('.delete-image').on('click', function(e){
+            e.preventDefault();
+            let review_image_id = $(this).siblings('input').val();
+            let image_path = $(this).siblings('img').attr('src');
+            let data = {
+              review_image_id: review_image_id,
+              image_path: image_path
+            };
+            $.post("index.php?route=catalog/review/deleteReviewImage&user_token={{ user_token }}", data, function (res) {
+              console.log(res);
+            })
+          });
+          {% endif %}
+        </script>
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <!-- VIEW FILES END -->
+
+  <!-- ========== Admin panel settings END ========== -->
+  <!-- ============================================== -->
+<!-- ============================================================================ -->
+  <!-- ============================================== -->
+  <!-- ============== Catalog setting ============== -->
+
+  <!-- ============================================= -->
+  
+  <!-- LANGUAGE FILES -->
+
+  <file path="catalog/language/*/product/product.php">
+    <operation>
+      <search><![CDATA[// Entry]]></search>
+      <add position="after">
+        <![CDATA[
+            $_['entry_images']             = 'Images';
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <!-- LANGUAGE FILES END -->
+
+  <!-- ============================================= -->
+
+  <!-- CONTROLLER FILES -->
+
+  <file path="catalog/controller/product/product.php">
+    <operation>
+      <search><![CDATA[$this->document->setTitle($product_info['meta_title']);]]></search>
+      <add position="after">
+        <![CDATA[
+            $this->document->addStyle('catalog/view/theme/css/image-uploader.min.css');
+            $this->document->addScript('catalog/view/theme/js/image-uploader.min.js');
+            $this->document->addStyle('catalog/view/theme/css/h-smart-thumbnail.css');
+            $this->document->addScript('catalog/view/theme/js/h-smart-thumbnail.js');
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <file path="catalog/controller/product/product.php">
+    <operation>
+      <search><![CDATA[public function review() {]]></search>
+      <add position="before">
+        <![CDATA[
+            private function parseReviewImages($images){
+                $image_names = [];
+                foreach ($images as $image){
+                    $image_names[] = [
+                        'image' => $this->request->server['HTTP'] ? HTTP_SERVER . 'image/' . $image['image'] : HTTPS_SERVER . 'image/' . $image['image']
+                    ];
+                }
+                return $image_names;
+            }
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <file path="catalog/controller/product/product.php">
+    <operation>
+      <search><![CDATA[(int)$result['rating'],]]></search>
+      <add position="after">
+        <![CDATA[
+            'images'     => (count($this->model_catalog_review->getReviewImages($result['review_id'])) > 0) ? $this->parseReviewImages($this->model_catalog_review->getReviewImages($result['review_id'])) : "",
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <file path="catalog/controller/product/product.php">
+    <operation>
+      <search><![CDATA[// Captcha]]></search>
+      <add position="before">
+        <![CDATA[
+            if (file_exists($_FILES['images']['tmp_name'][0])){
+            $allowed_extension = ["jpeg","jpg","png"];
+            foreach ($this->request->files['images']['tmp_name'] as $key=>$temp_name){
+                      $image_name = $this->request->files["images"]["name"][$key];
+                      $ext = pathinfo($image_name,PATHINFO_EXTENSION);
+                      // validate extension
+                      if(!in_array($ext, $allowed_extension)) {
+                          $json['error'] = "One of image extension is not correct";
+                      }
+                      // Validate the filename length
+                      if ((utf8_strlen($image_name) < 3) || (utf8_strlen($image_name) > 64)) {
+                          $json['error'] = "File name must be between 3 and 64 characters";
+                      }
+                  }
+              }
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <file path="catalog/controller/product/product.php">
+    <operation>
+      <search><![CDATA[$this->model_catalog_review->addReview($this->request->get['product_id'], $this->request->post);]]></search>
+      <add position="replace">
+        <![CDATA[
+            $this->model_catalog_review->addReview($this->request->get['product_id'], $this->request->post, empty($this->request->files['images']['name']) ? null : $this->request->files);
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <file path="catalog/controller/product/product.php">
+    <operation>
+      <search><![CDATA[public function index() {]]></search>
+      <add position="after">
+        <![CDATA[
+            $this->load->model('setting/setting');
+            $data['no_of_images'] = $this->model_setting_setting->getSettingValue('images_with_review_no_of_images');
+            if($data['no_of_images'] == ''){
+            $data['no_of_images'] = 3;
+            }
+            $data['image_size'] = $this->model_setting_setting->getSettingValue('images_with_review_image_size');
+            if($data['image_size'] == ''){
+            $data['image_size'] = 1048576;
+            }
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <!-- CONTROLLER FILES END -->
+
+  <!-- ============================================= -->
+
+  <!-- MODEL FILES -->
+
+  <file path="catalog/model/catalog/review.php">
+    <operation>
+      <search><![CDATA[public function addReview($product_id, $data) {]]></search>
+      <add position="replace">
+        <![CDATA[
+            public function addReview($product_id, $data, $images = null) {
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <file path="catalog/model/catalog/review.php">
+    <operation>
+      <search><![CDATA[$review_id = $this->db->getLastId();]]></search>
+      <add position="after">
+        <![CDATA[
+        // Add images if any
+        if ($images != null && $review_id){
+            $allowed_extension = ["jpeg","jpg","png"];
+
+            foreach ($this->request->files['images']['tmp_name'] as $key=>$temp_name){
+                $image_name = $this->request->files["images"]["name"][$key];
+                $image_tmp = $this->request->files["images"]["tmp_name"][$key];
+
+                $ext = pathinfo($image_name,PATHINFO_EXTENSION);
+
+                // validate extension
+                if(in_array($ext, $allowed_extension) && ((utf8_strlen($image_name) > 3) || (utf8_strlen($image_name) < 64))) {
+                    $upload_path = 'catalog/review/' . $image_name;
+                    move_uploaded_file($image_tmp, DIR_IMAGE . $upload_path);
+
+                    $this->db->query("INSERT INTO " . DB_PREFIX . "review_images SET review_id = '" . (int)$review_id . "', image = '" . $upload_path . "'");
+                }
+
+            }
+        }
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <file path="catalog/model/catalog/review.php">
+    <operation>
+      <search><![CDATA[public function getTotalReviewsByProductId($product_id) {]]></search>
+      <add position="before">
+        <![CDATA[
+            public function getReviewImages($review_id){
+                $query = $this->db->query("SELECT * FROM " . DB_PREFIX . "review_images WHERE review_id = '" . $review_id . "'");
+                return $query->rows;
+            }
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <!-- MODEL FILES END -->
+
+  <!-- ============================================= -->
+
+  <!-- VIEW FILES -->
+
+  <file path="catalog/view/theme/*/template/product/product.twig">
+    <operation info="Add plugin call script">
+      <search><![CDATA[$('#review').delegate('.pagination a', 'click', function(e) {]]></search>
+      <add position="after" offset="2">
+        <![CDATA[
+        setTimeout(function () {  
+          $('.review-images').hSmartThumbnail();  
+        }, 400);
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <file path="catalog/view/theme/*/template/product/product.twig">
+    <operation info="Add ajax script to handle images">
+      <search><![CDATA[data: $("#form-review").serialize(),]]></search>
+      <add position="replace">
+        <![CDATA[
+        contentType: false, 
+        processData: false, 
+        cache: false, 
+        data: new FormData(document.getElementById('form-review')),
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <file path="catalog/view/theme/*/template/product/product.twig">
+    <operation info="Add ajax script to handle images">
+      <search><![CDATA[$('#review').after('<div class="alert alert-success alert-dismissible"><i class="fa fa-check-circle"></i> ' + json['success'] + '</div>');]]></search>
+      <add position="after">
+        <![CDATA[
+          $('.delete-image').click();  
+          $('.upload-text').css('display', 'flex');
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <file path="catalog/view/theme/*/template/product/product.twig">
+    <operation>
+      <search index="0"><![CDATA[<script type="text/javascript"><!--]]></search>
+      <add position="before">
+        <![CDATA[
+          <script type="text/javascript"> 
+            $('.input-images').imageUploader({  
+                extensions: ['.jpg', '.jpeg', '.png'],  
+                maxFiles: '{{ no_of_images }}',
+                maxSize: '{{ image_size }}',  
+            }); 
+            $(document).ready(function () { 
+              setTimeout(function () {  
+                $('.review-images').hSmartThumbnail();  
+              }, 1000)  
+            });
+          </script>
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <!--  -->
+
+  <file path="catalog/view/theme/*/template/product/product.twig">
+    <operation>
+      <search><![CDATA[<form class="form-horizontal" id="form-review">]]></search>
+      <add position="replace">
+        <![CDATA[
+          <form class="form-horizontal" id="form-review" enctype="multipart/form-data">
+        ]]> 
+      </add>
+    </operation>
+  </file>
+  
+  <file path="catalog/view/theme/*/template/product/product.twig">
+    <operation>
+      <search><![CDATA[{{ captcha }}]]></search>
+      <add position="before">
+        <![CDATA[
+          <div class="form-group">
+			<div class="col-sm-12">
+				<label class="control-label">{{ entry_images }}</label>
+				  <div class="input-images" style="width: 100%"></div>
+            </div>
+          </div>
+        ]]> 
+      </add>
+    </operation>
+  </file>
+  
+  <!-- For Journal 3 -->
+  <file path="catalog/view/theme/*/template/*/module/product_blocks_reviews.twig">
+    <operation>
+      <search><![CDATA[<form class="form-horizontal" id="form-review">]]></search>
+      <add position="replace">
+        <![CDATA[
+          <form class="form-horizontal" id="form-review" enctype="multipart/form-data">
+        ]]> 
+      </add>
+    </operation>
+  </file>
+  
+  <file path="catalog/view/theme/*/template/*/module/product_blocks_reviews.twig">
+    <operation>
+      <search><![CDATA[{{ captcha }}]]></search>
+      <add position="before">
+        <![CDATA[
+          <div class="form-group">
+            <label class="col-sm-2 control-label">{{ entry_images }}</label>
+            <div class="col-sm-10">
+              <div class="input-images" style="width: 100%"></div>
+            </div>
+          </div>
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+  <!--  -->
+
+  <file path="catalog/view/theme/*/template/product/review.twig">
+    <operation>
+      <search><![CDATA[</table>]]></search>
+      <add position="before">
+        <![CDATA[
+          {% if review.images %}
+            <tr>
+              <td>
+                  <div class="review-images">
+                      <ul>
+                          {% for image in review.images %}
+                              <li>
+                                  <img src="{{ image.image }}" alt="review image">
+                              </li>
+                          {% endfor %}
+                      </ul>
+                  </div>
+              </td>
+              <td></td>
+            </tr>
+          {% endif %}
+        ]]> 
+      </add>
+    </operation>
+  </file>
+
+
+  <!-- VIEW FILES END -->
+
+  <!-- ============ Catalog settings END ============ -->
+  <!-- ============================================== -->
+
+</modification>

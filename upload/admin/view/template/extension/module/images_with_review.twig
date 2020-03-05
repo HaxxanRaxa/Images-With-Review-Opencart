@@ -1,0 +1,58 @@
+{{ header }}{{ column_left }}
+<div id="content">
+    <div class="page-header">
+        <div class="container-fluid">
+            <div class="pull-right">
+                <button type="submit" form="form-module" data-toggle="tooltip" title="{{ button_save }}" class="btn btn-primary"><i class="fa fa-save"></i></button>
+                <a href="{{ action.cancel }}" data-toggle="tooltip" title="{{ button_cancel }}" class="btn btn-default"><i class="fa fa-reply"></i></a></div>
+            <h1>{{ heading_title }}</h1>
+            <ul class="breadcrumb">
+                {% for breadcrumb in breadcrumbs %}
+                    <li><a href="{{ breadcrumb.href }}">{{ breadcrumb.text }}</a></li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    <div class="container-fluid">
+        {% if error.permission %}
+            <div class="alert alert-danger alert-dismissible"><i class="fa fa-exclamation-circle"></i> {{ error_permission }}
+                <button type="button" class="close" data-dismiss="alert">&times;</button>
+            </div>
+        {% elseif error|length > 0 %}
+            <div class="alert alert-danger alert-dismissible"><i class="fa fa-exclamation-circle"></i> {{ error_warning }}
+                <button type="button" class="close" data-dismiss="alert">&times;</button>
+            </div>
+        {% endif %}
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h3 class="panel-title"><i class="fa fa-pencil"></i> {{ text_edit }}</h3>
+            </div>
+            <div class="panel-body">
+                <form action="{{ action.save }}" method="post" enctype="multipart/form-data" id="form-module" class="form-horizontal">
+                    <div class="form-group">
+                        <label class="col-sm-2 control-label" for="input-no-of-images">{{ entry_no_of_images }}
+                            <span data-toggle="tooltip" title="{{ help_no_of_images }}"></span></label>
+                        <div class="col-sm-10">
+                            <input type="number" min="1" name="{{key_no_of_images}}" value="{{ images_with_review_no_of_images }}" placeholder="{{ placeholder_no_of_images }}" id="input-no-of-images" class="form-control" />
+                            {% if error.images  %}
+                                <div class="text-danger">{{ error_no_of_images }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="col-sm-2 control-label" for="input-image-size">{{ entry_image_size }}
+                            <span data-toggle="tooltip" title="{{ help_image_size }}"></span></label>
+                        <div class="col-sm-10">
+                            <input type="number" min="1" name="{{key_image_size}}" value="{{ images_with_review_image_size }}" placeholder="{{ placeholder_image_size }}" id="input-image-size" class="form-control" />
+                            {% if error.size  %}
+                                <div class="text-danger">{{ error_image_size }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <input type="hidden" name="code" value="images_with_review">
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{{ footer }}
